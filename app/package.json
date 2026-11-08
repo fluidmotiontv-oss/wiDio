@@ -1,0 +1,13 @@
+{
+  "name": "radio-webgl-visualizer",
+  "version": "1.0.0",
+  "description": "Server-side WebGL 3D Audio Visualizer for Radio Broadcasts",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "ws": "^8.17.0"
+  }
+}

@@ -1,248 +1,494 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FluidmotionTV Radio - WebGL Visualizer</title>
-    <style>
-        body, html {
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-            background-color: #050508;
-            font-family: monospace;
-            color: #00ffcc;
-        }
-        #canvas-container {
-            width: 100vw;
-            height: 100vh;
-            display: block;
-        }
-        #ui-overlay {
-            position: absolute;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            text-align: center;
-            z-index: 10;
-            background: rgba(5, 5, 8, 0.85);
-            padding: 15px 30px;
-            border: 1px solid #00ffcc;
-            border-radius: 8px;
-            box-shadow: 0 0 20px rgba(0, 255, 204, 0.3);
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            align-items: center;
-        }
-        .btn {
-            border: 1px solid #00ffcc;
-            background: transparent;
-            color: #00ffcc;
-            display: inline-block;
-            padding: 8px 16px;
-            cursor: pointer;
-            border-radius: 4px;
-            transition: all 0.3s ease;
-            text-transform: uppercase;
-            font-weight: bold;
-            letter-spacing: 1px;
-            font-family: monospace;
-            text-decoration: none;
-            font-size: 0.9rem;
-        }
-        .btn:hover {
-            background: #00ffcc;
-            color: #050508;
-            box-shadow: 0 0 10px #00ffcc;
-        }
-        #track-info {
-            font-size: 0.85rem;
-            opacity: 0.8;
-            letter-spacing: 0.5px;
-        }
-        .links-row {
-            display: flex;
-            gap: 10px;
-            margin-top: 5px;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fluid Motion TV — Broadcast Visual Engine</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #000; overflow: hidden; font-family: 'Segoe UI', Tahoma, sans-serif; color: #fff; }
+
+    #hud {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      pointer-events: none; display: flex; flex-direction: column; justify-content: space-between;
+      padding: 30px; z-index: 10;
+    }
+    .top-row { display: flex; justify-content: space-between; align-items: flex-start; }
+
+    .header-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(255, 0, 85, 0.2); border: 1px solid #ff0055;
+      padding: 6px 14px; border-radius: 20px; font-weight: bold; font-size: 12px;
+      letter-spacing: 1.5px; text-transform: uppercase; color: #ff0055;
+      box-shadow: 0 0 15px rgba(255, 0, 85, 0.4); width: fit-content;
+    }
+    .live-dot { width: 8px; height: 8px; background: #ff0055; border-radius: 50%; animation: pulse 1s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+    .brand-block { text-align: right; }
+    .brand-block .brand {
+      font-size: 15px; font-weight: 800; letter-spacing: 3px; text-transform: uppercase;
+      background: linear-gradient(90deg, #00f3ff, #ff0055);
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .brand-block .tagline {
+      font-size: 10px; letter-spacing: 2.5px; text-transform: uppercase;
+      color: rgba(255,255,255,0.45); margin-top: 3px;
+    }
+    .brand-block .d9clock {
+      font-size: 12px; font-variant-numeric: tabular-nums; letter-spacing: 1px;
+      color: #00f3ff; margin-top: 6px; text-shadow: 0 0 10px rgba(0,243,255,0.6);
+    }
+    .brand-block .d9clock .apex { color: #ffaa00; text-shadow: 0 0 10px rgba(255,170,0,0.8); }
+
+    .bottom-row { display: flex; justify-content: space-between; align-items: flex-end; }
+
+    .track-card {
+      display: flex; align-items: center; gap: 20px;
+      background: rgba(10, 10, 20, 0.7); backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.1); padding: 16px; border-radius: 12px;
+      max-width: 480px; box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+      transition: all 0.5s ease;
+    }
+    .track-card.flash { animation: cardFlash 0.6s ease; }
+    @keyframes cardFlash {
+      0% { border-color: #00f3ff; box-shadow: 0 0 40px rgba(0,243,255,0.5); }
+      100% { border-color: rgba(255,255,255,0.1); box-shadow: 0 20px 40px rgba(0,0,0,0.5); }
+    }
+    .album-art { width: 70px; height: 70px; border-radius: 8px; object-fit: cover; background: #111; }
+    .track-info h2 { font-size: 20px; font-weight: 700; margin-bottom: 4px; color: #fff; }
+    .track-info p { font-size: 14px; color: rgba(255, 255, 255, 0.7); }
+    .track-info .genre-chip {
+      display: inline-block; margin-top: 6px; font-size: 10px; letter-spacing: 1.5px;
+      text-transform: uppercase; color: #00f3ff; border: 1px solid rgba(0,243,255,0.4);
+      padding: 2px 8px; border-radius: 10px;
+    }
+
+    .vu-strip {
+      display: flex; gap: 3px; align-items: flex-end; height: 34px; margin-bottom: 10px;
+      opacity: 0.9;
+    }
+    .vu-strip .bar {
+      width: 5px; border-radius: 2px;
+      background: linear-gradient(180deg, #ff0055, #00f3ff);
+      transition: height 0.08s linear;
+    }
+
+    #controls {
+      position: absolute; bottom: 30px; right: 30px; z-index: 20;
+      display: flex; gap: 10px; background: rgba(0,0,0,0.7); padding: 10px; border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    select, button {
+      background: #111; color: #00f3ff; border: 1px solid #00f3ff;
+      padding: 8px 16px; border-radius: 6px; font-weight: bold; cursor: pointer;
+      outline: none; transition: 0.2s; font-size: 12px;
+    }
+    select:hover, button:hover { background: #00f3ff; color: #000; }
+
+    #hint {
+      position: absolute; bottom: 90px; right: 30px; z-index: 20;
+      font-size: 10px; color: rgba(255,255,255,0.35); letter-spacing: 1px; text-align: right;
+    }
+  </style>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
 </head>
 <body>
 
-    <div id="canvas-container"></div>
-
-    <div id="ui-overlay">
-        <div id="track-info">Ready to initialize stream</div>
-        <div class="links-row">
-            <button id="toggle-stream" class="btn">Play Radio</button>
-            <button id="next-track" class="btn">Next Track</button>
-            <a href="YOUR_EBOOK_LINK_HERE" target="_blank" class="btn">Get Ebook</a>
-        </div>
+  <div id="hud">
+    <div class="top-row">
+      <div class="header-badge"><div class="live-dot"></div> Studio 1 // On-Air</div>
+      <div class="brand-block">
+        <div class="brand">Fluid Motion TV</div>
+        <div class="tagline">Dragon Nine &mdash; Fluid Motion of the Future</div>
+        <div class="d9clock" id="d9clock">D9 --:--</div>
+      </div>
     </div>
+    <div class="bottom-row">
+      <div>
+        <div class="vu-strip" id="vuStrip"></div>
+        <div class="track-card" id="trackCard">
+          <img id="albumArt" class="album-art" src="" alt="Album Cover">
+          <div class="track-info">
+            <h2 id="songTitle">Cybernetic Pulse</h2>
+            <p id="artistName">Aether Wave ft. Synthia</p>
+            <span class="genre-chip" id="genreChip">Electronic</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
-    <!-- Three.js CDN -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <div id="hint">demo mode &mdash; connect /api/nowplaying for live automation feed</div>
 
-    <script>
-        // Add your local audio filenames here
-        const playlist = [
-            "track1.mp3",
-            "track2.mp3",
-            "track3.mp3"
-        ];
-        let currentTrackIndex = 0;
+  <div id="controls">
+    <select id="genreSelect">
+      <option value="electronic">Genre: Electronic / EDM</option>
+      <option value="rock">Genre: Rock / Metal</option>
+      <option value="ambient">Genre: Ambient / Lofi</option>
+      <option value="talk">Genre: Talk Radio / Speech</option>
+    </select>
+    <button id="audioBtn">ACTIVATE LIVE AUDIO</button>
+  </div>
 
-        let scene, camera, renderer, geometry, material, mesh, analyser, audio, audioContext, source;
-        const container = document.getElementById('canvas-container');
-        const trackInfo = document.getElementById('track-info');
-        const toggleBtn = document.getElementById('toggle-stream');
-        const nextBtn = document.getElementById('next-track');
+<script>
+// --- PRESET CONFIGURATIONS ---
+const PRESETS = {
+  electronic: { bloomStrength: 2.2, bounceMultiplier: 5.0, smokeSpeed: 2.2, light1Color: 0x00f3ff, light2Color: 0xff0055, light1Anisotropy: 0.75, freqBin: 2, label: 'Electronic' },
+  rock:       { bloomStrength: 1.5, bounceMultiplier: 3.5, smokeSpeed: 3.5, light1Color: 0xff3300, light2Color: 0xffaa00, light1Anisotropy: -0.2, freqBin: 6, label: 'Rock' },
+  ambient:    { bloomStrength: 0.8, bounceMultiplier: 1.2, smokeSpeed: 0.5, light1Color: 0x7700ff, light2Color: 0x00ffaa, light1Anisotropy: 0.3, freqBin: 1, label: 'Ambient' },
+  talk:       { bloomStrength: 0.5, bounceMultiplier: 2.0, smokeSpeed: 0.2, light1Color: 0xffffff, light2Color: 0x0088ff, light1Anisotropy: 0.0, freqBin: 12, label: 'Talk' }
+};
+let activePreset = PRESETS.electronic;
 
-        function init() {
-            // Scene Setup
-            scene = new THREE.Scene();
-            scene.fog = new THREE.FogExp2(0x050508, 0.035);
+// --- DRAGON NINE CLOCK (54-minute hours, 1600 D9 minutes per day) ---
+const APEX_HOURS = [9, 23]; // two Apex windows daily (D9 hours)
+function updateD9Clock() {
+  const now = new Date();
+  const secToday = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+  const d9minTotal = Math.floor(secToday / 54); // 1 D9 minute = 54 real seconds
+  const h = Math.floor(d9minTotal / 60);
+  const m = d9minTotal % 60;
+  const isApex = APEX_HOURS.some(a => Math.abs(h - a) <= 0 && m < 18); // ~18-min Apex window at top of hour
+  const el = document.getElementById('d9clock');
+  el.innerHTML = `D9 ${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}` +
+    (isApex ? ' <span class="apex">&#9670; APEX</span>' : '');
+}
+setInterval(updateD9Clock, 1000);
+updateD9Clock();
 
-            // Camera
-            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.z = 7;
+// --- DEMO NOW-PLAYING ROTATION (until real automation feed connects) ---
+const DEMO_TRACKS = [
+  { title: 'Cybernetic Pulse', artist: 'Aether Wave ft. Synthia', genre: 'electronic' },
+  { title: 'Tide Synth Rising', artist: 'Dragon Nine Collective', genre: 'ambient' },
+  { title: 'Neon Undertow', artist: 'Volt Meridian', genre: 'electronic' },
+  { title: 'Static Cathedral', artist: 'The Shavings', genre: 'rock' },
+  { title: 'Late Night Frequency', artist: 'Studio 1 Roundtable', genre: 'talk' }
+];
+let demoMode = true;
+let demoIdx = 0;
 
-            // Renderer
-            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(window.devicePixelRatio);
-            container.appendChild(renderer.domElement);
+function makeArtDataURL(title, genreKey) {
+  const c = document.createElement('canvas');
+  c.width = c.height = 200;
+  const g = c.getContext('2d');
+  const colors = {
+    electronic: ['#00f3ff', '#ff0055'], rock: ['#ff3300', '#ffaa00'],
+    ambient: ['#7700ff', '#00ffaa'], talk: ['#ffffff', '#0088ff']
+  }[genreKey] || ['#00f3ff', '#ff0055'];
+  const grad = g.createLinearGradient(0, 0, 200, 200);
+  grad.addColorStop(0, colors[0]); grad.addColorStop(1, '#050510');
+  g.fillStyle = grad; g.fillRect(0, 0, 200, 200);
+  g.strokeStyle = colors[1]; g.lineWidth = 2;
+  for (let i = 0; i < 7; i++) {
+    g.beginPath();
+    g.arc(100, 100, 14 + i * 12, Math.random() * 6.28, Math.random() * 3 + 2);
+    g.stroke();
+  }
+  g.fillStyle = 'rgba(0,0,0,0.45)'; g.fillRect(0, 140, 200, 60);
+  g.fillStyle = '#fff'; g.font = 'bold 15px sans-serif'; g.textAlign = 'center';
+  g.fillText(title.slice(0, 18), 100, 168);
+  g.fillStyle = colors[0]; g.font = '10px sans-serif';
+  g.fillText('FLUID MOTION TV', 100, 186);
+  return c.toDataURL();
+}
 
-            // Geometry & Material
-            geometry = new THREE.TorusKnotGeometry(2, 0.6, 128, 32);
-            material = new THREE.MeshStandardMaterial({
-                color: 0x00ffcc,
-                wireframe: true,
-                emissive: 0x004444,
-                roughness: 0.2,
-                metalness: 0.8
-            });
+function showTrack(data) {
+  if (data.title) document.getElementById('songTitle').innerText = data.title;
+  if (data.artist) document.getElementById('artistName').innerText = data.artist;
+  const art = document.getElementById('albumArt');
+  art.onerror = () => { art.onerror = null; art.src = makeArtDataURL(data.title || 'FM', (data.genre || 'electronic').toLowerCase()); };
+  art.src = data.albumArt || makeArtDataURL(data.title || 'FM', (data.genre || 'electronic').toLowerCase());
+  if (data.genre) {
+    applyPreset(data.genre.toLowerCase());
+    document.getElementById('genreChip').innerText = activePreset.label;
+  }
+  const card = document.getElementById('trackCard');
+  card.classList.remove('flash'); void card.offsetWidth; card.classList.add('flash');
+}
 
-            mesh = new THREE.Mesh(geometry, material);
-            scene.add(mesh);
+setInterval(() => {
+  if (!demoMode) return;
+  demoIdx = (demoIdx + 1) % DEMO_TRACKS.length;
+  showTrack(DEMO_TRACKS[demoIdx]);
+}, 18000);
+showTrack(DEMO_TRACKS[0]);
 
-            // Lighting
-            scene.add(new THREE.AmbientLight(0xffffff, 0.5));
-            const pointLight = new THREE.PointLight(0xff00ff, 2, 50);
-            pointLight.position.set(5, 5, 5);
-            scene.add(pointLight);
+// --- THREE.JS INITIALIZATION ---
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x050510, 0.03);
 
-            const pointLight2 = new THREE.PointLight(0x00ffff, 2, 50);
-            pointLight2.position.set(-5, -5, 5);
-            scene.add(pointLight2);
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
+camera.position.set(0, 8, 18);
+camera.lookAt(0, 0, 0);
 
-            window.addEventListener('resize', onWindowResize);
-            setupAudioControls();
-        }
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+document.body.appendChild(renderer.domElement);
 
-        function loadTrack(index) {
-            if (playlist.length === 0) return;
-            
-            if (audio) {
-                audio.pause();
-            }
+const renderScene = new THREE.RenderPass(scene, camera);
+const bloomPass = new THREE.UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), activePreset.bloomStrength, 0.4, 0.15);
+const composer = new THREE.EffectComposer(renderer);
+composer.addPass(renderScene);
+composer.addPass(bloomPass);
 
-            const trackPath = playlist[index];
-            audio = new Audio(trackPath);
-            audio.crossOrigin = "anonymous";
+// Ambient + rim light so the grid reads even at low bloom
+scene.add(new THREE.AmbientLight(0x334, 0.6));
+const rim = new THREE.PointLight(0x00f3ff, 1.2, 60);
+rim.position.set(0, 10, 0);
+scene.add(rim);
 
-            if (!audioContext) {
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            }
+// Instanced Floor Grid
+const GRID_SIZE = 12;
+const count = GRID_SIZE * GRID_SIZE;
+const instancedMesh = new THREE.InstancedMesh(
+  new THREE.BoxGeometry(0.8, 1, 0.8),
+  new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2, metalness: 0.8 }),
+  count
+);
+scene.add(instancedMesh);
 
-            if (source) {
-                source.disconnect();
-            }
+const dummy = new THREE.Object3D();
+const positions = [];
+let idx = 0;
+for (let x = 0; x < GRID_SIZE; x++) {
+  for (let z = 0; z < GRID_SIZE; z++) {
+    const posX = (x - GRID_SIZE / 2) * 1.2;
+    const posZ = (z - GRID_SIZE / 2) * 1.2;
+    positions.push({ x: posX, z: posZ });
+    dummy.position.set(posX, 0, posZ);
+    dummy.updateMatrix();
+    instancedMesh.setMatrixAt(idx++, dummy.matrix);
+  }
+}
 
-            source = audioContext.createMediaElementSource(audio);
-            analyser = audioContext.createAnalyser();
-            analyser.fftSize = 256;
+// Dual-Light Smoke Shader
+const smokeVertexShader = `
+  varying vec3 vWorldPosition;
+  void main() {
+    vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+    vWorldPosition = worldPosition.xyz;
+    gl_Position = projectionMatrix * viewMatrix * worldPosition;
+  }
+`;
 
-            source.connect(analyser);
-            analyser.connect(audioContext.destination);
+const smokeFragmentShader = `
+  uniform vec3 uCameraPos;
+  uniform float uTime;
+  uniform float uAudioFreq;
+  uniform vec3 uVelocity;
+  uniform vec3 uLight1Pos;
+  uniform vec3 uLight1Color;
+  uniform float uLight1Anisotropy;
+  uniform vec3 uLight2Pos;
+  uniform vec3 uLight2Color;
 
-            audio.play().then(() => {
-                toggleBtn.textContent = "Pause";
-                trackInfo.textContent = `Now Playing: ${trackPath}`;
-            }).catch(e => {
-                console.log("Playback error:", e);
-                trackInfo.textContent = `Error playing: ${trackPath}`;
-            });
+  varying vec3 vWorldPosition;
 
-            audio.onended = () => {
-                currentTrackIndex = (currentTrackIndex + 1) % playlist.length;
-                loadTrack(currentTrackIndex);
-            };
-        }
+  float rand(vec2 co) { return fract(sin(dot(co.xy, vec2(12.9898, 78.233))) * 43758.5453); }
+  float hash(float n) { return fract(sin(n) * 43758.5453123); }
+  float noise(vec3 x) {
+    vec3 p = floor(x); vec3 f = fract(x);
+    f = f * f * (3.0 - 2.0 * f);
+    float n = p.x + p.y * 57.0 + 113.0 * p.z;
+    return mix(mix(mix(hash(n + 0.0), hash(n + 1.0), f.x),
+                   mix(hash(n + 57.0), hash(n + 58.0), f.x), f.y),
+               mix(mix(hash(n + 113.0), hash(n + 114.0), f.x),
+                   mix(hash(n + 170.0), hash(n + 171.0), f.x), f.y), f.z);
+  }
 
-        function setupAudioControls() {
-            toggleBtn.addEventListener('click', () => {
-                if (!audioContext) {
-                    loadTrack(currentTrackIndex);
-                    return;
-                }
+  float phaseHG(float cosTheta, float g) {
+    float g2 = g * g;
+    return (1.0 - g2) / (4.0 * 3.14159265 * pow(1.0 + g2 - 2.0 * g * cosTheta, 1.5));
+  }
 
-                if (audioContext.state === 'suspended') {
-                    audioContext.resume();
-                }
+  void main() {
+    vec3 rayDir = normalize(vWorldPosition - uCameraPos);
+    float jitter = rand(gl_FragCoord.xy);
+    float stepSize = 0.5;
+    vec3 rayPos = uCameraPos + rayDir * (jitter * stepSize);
 
-                if (audio.paused) {
-                    audio.play();
-                    toggleBtn.textContent = "Pause";
-                    trackInfo.textContent = `Now Playing: ${playlist[currentTrackIndex]}`;
-                } else {
-                    audio.pause();
-                    toggleBtn.textContent = "Play Radio";
-                    trackInfo.textContent = "Stream Paused";
-                }
-            });
+    float totalDensity = 0.0;
+    vec3 accumulatedLight = vec3(0.0);
 
-            nextBtn.addEventListener('click', () => {
-                currentTrackIndex = (currentTrackIndex + 1) % playlist.length;
-                loadTrack(currentTrackIndex);
-            });
-        }
+    for(int i = 0; i < 12; i++) {
+      rayPos += rayDir * stepSize;
+      vec3 animatedPos = rayPos * 0.25 - (uVelocity * uTime * 0.3);
+      float densitySample = noise(animatedPos) * 0.6 + noise(animatedPos * 2.1) * 0.4;
 
-        function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        }
+      if (densitySample > 0.42) {
+        float stepDensity = (densitySample - 0.42) * stepSize * (1.0 + uAudioFreq * 1.5);
+        totalDensity += stepDensity;
+        float transmittance = exp(-totalDensity * 2.0);
 
-        function animate() {
-            requestAnimationFrame(animate);
+        vec3 l1Dir = normalize(uLight1Pos - rayPos);
+        float phase1 = phaseHG(dot(rayDir, l1Dir), uLight1Anisotropy);
 
-            mesh.rotation.x += 0.003;
-            mesh.rotation.y += 0.005;
+        vec3 l2Dir = normalize(uLight2Pos - rayPos);
+        float phase2 = phaseHG(dot(rayDir, l2Dir), -0.2);
 
-            if (analyser) {
-                const dataArray = new Uint8Array(analyser.frequencyBinCount);
-                analyser.getByteFrequencyData(dataArray);
+        accumulatedLight += (uLight1Color * phase1 + uLight2Color * phase2) * stepDensity * transmittance;
+      }
+    }
 
-                let sum = 0;
-                for(let i = 0; i < 10; i++) {
-                    sum += dataArray[i];
-                }
-                let bass = sum / 10;
+    gl_FragColor = vec4(vec3(0.01) + accumulatedLight * 4.0, min(totalDensity * 1.5, 0.85));
+  }
+`;
 
-                let scale = 1 + (bass / 255) * 0.4;
-                mesh.scale.set(scale, scale, scale);
+const light1Pos = new THREE.Vector3(-6, 4, -2);
+const light2Pos = new THREE.Vector3(6, 2, 4);
 
-                let colorVal = (bass / 255);
-                material.emissive.setRGB(0, colorVal * 0.8, colorVal);
-            }
+const smokeMaterial = new THREE.ShaderMaterial({
+  vertexShader: smokeVertexShader,
+  fragmentShader: smokeFragmentShader,
+  uniforms: {
+    uCameraPos:        { value: camera.position },
+    uTime:             { value: 0 },
+    uAudioFreq:        { value: 0 },
+    uVelocity:         { value: new THREE.Vector3(0.3, activePreset.smokeSpeed, -0.1) },
+    uLight1Pos:        { value: light1Pos },
+    uLight1Color:      { value: new THREE.Color(activePreset.light1Color) },
+    uLight1Anisotropy: { value: activePreset.light1Anisotropy },
+    uLight2Pos:        { value: light2Pos },
+    uLight2Color:      { value: new THREE.Color(activePreset.light2Color) }
+  },
+  transparent: true,
+  blending: THREE.AdditiveBlending,
+  side: THREE.BackSide
+});
 
-            renderer.render(scene, camera);
-        }
+const smokeBox = new THREE.Mesh(new THREE.BoxGeometry(20, 10, 20), smokeMaterial);
+smokeBox.position.y = 3;
+scene.add(smokeBox);
 
-        init();
-        animate();
-    </script>
+// --- VU STRIP (HUD) ---
+const vuStrip = document.getElementById('vuStrip');
+const VU_BARS = 24;
+const vuEls = [];
+for (let i = 0; i < VU_BARS; i++) {
+  const b = document.createElement('div');
+  b.className = 'bar'; b.style.height = '4px';
+  vuStrip.appendChild(b); vuEls.push(b);
+}
+
+// --- AUDIO PIPELINE & WEBSOCKET ---
+let analyser, dataArray;
+
+async function initServerAudio() {
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const stream = await navigator.mediaDevices.getUserMedia({
+    audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+  });
+  const source = audioCtx.createMediaStreamSource(stream);
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 64;
+  dataArray = new Uint8Array(analyser.frequencyBinCount);
+  source.connect(analyser);
+}
+
+// Simulated signal so the visual breathes in demo mode (kick ~124bpm + hat shimmer)
+function pseudoAudio(time) {
+  const beat = Math.pow(Math.max(0, Math.sin(time * Math.PI * 2 * (124 / 60))), 6);
+  const hat = Math.pow(Math.max(0, Math.sin(time * Math.PI * 4 * (124 / 60))), 12) * 0.35;
+  const sway = (Math.sin(time * 0.7) * 0.5 + 0.5) * 0.25;
+  return Math.min(1, beat * 0.8 + hat + sway + 0.05);
+}
+
+function applyPreset(presetKey) {
+  if (!PRESETS[presetKey]) return;
+  activePreset = PRESETS[presetKey];
+  document.getElementById('genreSelect').value = presetKey;
+  bloomPass.strength = activePreset.bloomStrength;
+  smokeMaterial.uniforms.uLight1Color.value.setHex(activePreset.light1Color);
+  smokeMaterial.uniforms.uLight2Color.value.setHex(activePreset.light2Color);
+  smokeMaterial.uniforms.uLight1Anisotropy.value = activePreset.light1Anisotropy;
+  smokeMaterial.uniforms.uVelocity.value.y = activePreset.smokeSpeed;
+}
+
+function connectWebSocket() {
+  let ws;
+  try { ws = new WebSocket(`ws://${location.host}`); } catch (e) { return; }
+  ws.onmessage = (event) => {
+    demoMode = false;
+    document.getElementById('hint').innerText = 'live feed connected // automation driving visuals';
+    try { showTrack(JSON.parse(event.data)); } catch (e) {}
+  };
+  ws.onclose = () => setTimeout(connectWebSocket, 3000);
+  ws.onerror = () => { try { ws.close(); } catch (e) {} };
+}
+
+document.getElementById('genreSelect').addEventListener('change', (e) => {
+  applyPreset(e.target.value);
+  document.getElementById('genreChip').innerText = activePreset.label;
+});
+document.getElementById('audioBtn').addEventListener('click', (e) => {
+  initServerAudio().catch(() => {});
+  e.target.style.display = 'none';
+});
+
+connectWebSocket();
+
+// --- ANIMATION LOOP ---
+const clock = new THREE.Clock();
+let smoothAudio = 0;
+
+function animate() {
+  requestAnimationFrame(animate);
+  const time = clock.getElapsedTime();
+
+  smokeMaterial.uniforms.uTime.value = time;
+  smokeMaterial.uniforms.uCameraPos.value.copy(camera.position);
+
+  let audioFactor;
+  if (analyser) {
+    analyser.getByteFrequencyData(dataArray);
+    audioFactor = dataArray[activePreset.freqBin] / 255.0;
+  } else {
+    audioFactor = pseudoAudio(time);
+  }
+  smoothAudio += (audioFactor - smoothAudio) * 0.35;
+  smokeMaterial.uniforms.uAudioFreq.value = smoothAudio;
+
+  // VU strip follows the signal
+  for (let i = 0; i < VU_BARS; i++) {
+    const wobble = Math.abs(Math.sin(time * 4 + i * 0.6)) * 0.5 + 0.5;
+    const h = 4 + smoothAudio * wobble * 30;
+    vuEls[i].style.height = h.toFixed(1) + 'px';
+  }
+
+  camera.position.x = Math.sin(time * 0.15) * 18;
+  camera.position.z = Math.cos(time * 0.15) * 18;
+  camera.lookAt(0, 1, 0);
+
+  for (let i = 0; i < count; i++) {
+    const pos = positions[i];
+    const dist = Math.sqrt(pos.x * pos.x + pos.z * pos.z);
+    const scaleY = Math.max(0.2, Math.sin(time * 3 + dist * 0.8) * 1.5 + (smoothAudio * activePreset.bounceMultiplier));
+
+    dummy.position.set(pos.x, scaleY / 2, pos.z);
+    dummy.scale.set(1, scaleY, 1);
+    dummy.updateMatrix();
+    instancedMesh.setMatrixAt(i, dummy.matrix);
+  }
+  instancedMesh.instanceMatrix.needsUpdate = true;
+  composer.render();
+}
+animate();
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  composer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
 </body>
 </html>
